@@ -1,0 +1,32 @@
+{
+    "event_hash_sha256": "a4c883fae8a3c1dbe76bd0996475c9c980988435f0d0d54b6665045121a1a187",
+    "event_metrics_count": 100,
+    "event_read_at": 1736225233166174,
+    "event_received_at": 1736225235168622,
+    "event_seconds": 1728513128,
+    "event_sent_at": 1736225235194844,
+    "metrics": [
+        {
+            "count": 100,
+            "snort_dst_address": "192.168.50.1",
+            "snort_eth_dst": "90:B1:1C:A2:C0:D3",
+            "snort_eth_src": "70:F3:5A:42:73:E8",
+            "snort_src_address": "172.16.0.5"
+        }
+    ],
+    "sensor_id": "raspberrypi4b",
+    "snort_action": "allow",
+    "snort_classification": "none",
+    "snort_direction": "C2S",
+    "snort_interface": "/datasets/pcap//SAT-01-12-2018_0191.pcap",
+    "snort_message": "(stream_ip) fragmentation overlap",
+    "snort_priority": 3,
+    "snort_protocol": "IP",
+    "snort_rule": "123:8:1",
+    "snort_rule_gid": 123,
+    "snort_rule_rev": 1,
+    "snort_rule_sid": 8,
+    "snort_seconds": 1728513128,
+    "snort_service": "unknown",
+    "snort_type_of_service": 0
+}
