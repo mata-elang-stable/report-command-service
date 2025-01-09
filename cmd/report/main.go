@@ -42,30 +42,9 @@ func main() {
 
 	countedMetrics := reducer.CountMetrics(cleansedMetrics)
 
-	outputData := map[string]interface{}{
-		"metrics":               countedMetrics,
-		"event_hash_sha256":     consumedMessage.EventHashSha256,
-		"event_metrics_count":   consumedMessage.EventMetricsCount,
-		"event_read_at":         consumedMessage.EventReadAt,
-		"event_received_at":     consumedMessage.EventReceivedAt,
-		"event_seconds":         consumedMessage.EventSeconds,
-		"event_sent_at":         consumedMessage.EventSentAt,
-		"sensor_id":             consumedMessage.SensorId,
-		"snort_action":          consumedMessage.SnortAction,
-		"snort_classification":  consumedMessage.SnortClassification,
-		"snort_direction":       consumedMessage.SnortDirection,
-		"snort_interface":       consumedMessage.SnortInterface,
-		"snort_message":         consumedMessage.SnortMessage,
-		"snort_priority":        consumedMessage.SnortPriority,
-		"snort_protocol":        consumedMessage.SnortProtocol,
-		"snort_rule":            consumedMessage.SnortRule,
-		"snort_rule_gid":        consumedMessage.SnortRuleGid,
-		"snort_rule_rev":        consumedMessage.SnortRuleRev,
-		"snort_rule_sid":        consumedMessage.SnortRuleSid,
-		"snort_seconds":         consumedMessage.SnortSeconds,
-		"snort_service":         consumedMessage.SnortService,
-		"snort_type_of_service": consumedMessage.SnortTypeOfService,
-	}
+	outputData := reducer.CreateOutputData(consumedMessage, countedMetrics)
+
+	// Next steps: Hit the API with the outputData
 
 	outputFilePath := "output_v2.json"
 	outputFile, err := os.Create(outputFilePath)
