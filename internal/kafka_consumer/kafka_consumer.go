@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry"
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde"
@@ -26,7 +27,7 @@ func NewKafkaConsumer(brokers, groupID, schemaRegistryURL string) (*Consumer, er
 		"group.id":           groupID,
 		"session.timeout.ms": 6000,
 		"auto.offset.reset":  "earliest",
-		"enable.auto.commit": false,
+		"enable.auto.commit": true,
 	}
 
 	consumer, err := kafka.NewConsumer(config)
@@ -85,7 +86,6 @@ func (c *Consumer) PollMessages(ctx context.Context, msgChan chan<- *pb.SensorEv
 	}
 
 	fmt.Printf("Closing consumer\n")
-	c.consumer.Close()
 }
 
 func (c *Consumer) ConsumeMessage(msg *kafka.Message, msgChan chan<- *pb.SensorEvent) {
@@ -110,7 +110,7 @@ func (c *Consumer) Close() {
 	c.consumer.Close()
 }
 
-func RunConsumer(consumer *Consumer) (*pb.SensorEvent, error) {
+func RunConsumer(consumer *Consumer) ([]*pb.SensorEvent, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -119,7 +119,7 @@ func RunConsumer(consumer *Consumer) (*pb.SensorEvent, error) {
 
 	msgChan := make(chan *pb.SensorEvent)
 	errChan := make(chan error)
-	var consumedMessage *pb.SensorEvent
+	var consumedMessages []*pb.SensorEvent
 
 	go func() {
 		<-sigChan
@@ -131,8 +131,7 @@ func RunConsumer(consumer *Consumer) (*pb.SensorEvent, error) {
 		for {
 			select {
 			case msg := <-msgChan:
-				consumedMessage = msg
-				cancel()
+				consumedMessages = append(consumedMessages, msg)
 			case <-ctx.Done():
 				return
 			}
@@ -152,10 +151,19 @@ func RunConsumer(consumer *Consumer) (*pb.SensorEvent, error) {
 		errChan <- nil
 	}()
 
-	select {
-	case <-ctx.Done():
-		return consumedMessage, nil
-	case err := <-errChan:
-		return nil, err
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if len(consumedMessages) > 0 {
+				return consumedMessages, nil
+			}
+		case err := <-errChan:
+			return nil, err
+		case <-ctx.Done():
+			return consumedMessages, nil
+		}
 	}
 }

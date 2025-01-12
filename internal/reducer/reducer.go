@@ -13,13 +13,26 @@ type Metric map[string]interface{}
 
 func CleanseMetric(metric *pb.Metric) Metric {
 	cleansedMetric := Metric{
-		// "snort_timestamp":   metric.SnortTimestamp,
-		"snort_src_address": metric.SnortSrcAddress,
-		"snort_dst_address": metric.SnortDstAddress,
-		"snort_src_port":    metric.SnortSrcPort,
-		"snort_dst_port":    metric.SnortDstPort,
+		"snort_src_address": getStringValue(metric.SnortSrcAddress),
+		"snort_dst_address": getStringValue(metric.SnortDstAddress),
+		"snort_src_port":    getIntValue(metric.SnortSrcPort),
+		"snort_dst_port":    getIntValue(metric.SnortDstPort),
 	}
 	return cleansedMetric
+}
+
+func getStringValue(value *string) string {
+	if value != nil {
+		return *value
+	}
+	return ""
+}
+
+func getIntValue(value *int64) int64 {
+	if value != nil {
+		return *value
+	}
+	return 0
 }
 
 func hashMetric(metric Metric) string {
@@ -67,17 +80,30 @@ func CountMetrics(metrics []Metric) []Metric {
 		metric["count"] = count
 		result = append(result, metric)
 	}
-
 	return result
 }
 
-func CreateOutputData(consumedMessage *pb.SensorEvent, countedMetrics []Metric) map[string]interface{} {
-	return map[string]interface{}{
-		"metrics":              countedMetrics,
-		"sensor_id":            consumedMessage.SensorId,
-		"event_metrics_count":  consumedMessage.EventMetricsCount,
-		"snort_classification": consumedMessage.SnortClassification,
-		"snort_message":        consumedMessage.SnortMessage,
-		"snort_priority":       consumedMessage.SnortPriority,
+func CreateOutputData(consumedMessages []*pb.SensorEvent) []map[string]interface{} {
+	var outputData []map[string]interface{}
+	for _, consumedMessage := range consumedMessages {
+		var cleansedMetrics []Metric
+		for _, metric := range consumedMessage.Metrics {
+			cleansedMetric := CleanseMetric(metric)
+			cleansedMetrics = append(cleansedMetrics, cleansedMetric)
+		}
+
+		countedMetrics := CountMetrics(cleansedMetrics)
+
+		data := map[string]interface{}{
+			"metrics":              countedMetrics,
+			"sensor_id":            consumedMessage.SensorId,
+			"event_metrics_count":  consumedMessage.EventMetricsCount,
+			"snort_classification": consumedMessage.SnortClassification,
+			"snort_message":        consumedMessage.SnortMessage,
+			"snort_priority":       consumedMessage.SnortPriority,
+			"snort_seconds":        consumedMessage.SnortSeconds,
+		}
+		outputData = append(outputData, data)
 	}
+	return outputData
 }
