@@ -1,12 +1,15 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"gitlab.com/mataelang/report-command-service/internal/kafka_consumer"
+	"gitlab.com/mataelang/report-command-service/internal/kafka_producer"
 	"gitlab.com/mataelang/report-command-service/internal/pb"
 	"gitlab.com/mataelang/report-command-service/internal/reducer"
 )
@@ -14,55 +17,92 @@ import (
 func main() {
 	brokers := "127.0.0.1:9093"
 	groupID := "dc-sensor-alerts"
-	schemaRegistryURL := "http://localhost:8081"
+	topic := "report-aggregated"
+	schemaRegistryURL := "http://127.0.0.1:8081"
+
 	log.Println("Creating Kafka Consumer")
 	consumer, err := kafka_consumer.NewKafkaConsumer(brokers, groupID, schemaRegistryURL)
 	if err != nil {
 		panic(err)
 	}
-	defer consumer.Close()
 
-	msgChan := make(chan *pb.SensorEvent)
+	producer, err := kafka_producer.NewKafkaProducer(brokers, schemaRegistryURL, topic)
+	if err != nil {
+		log.Fatalf("Error creating Kafka producer: %v\n", err)
+	}
+	defer producer.Close()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	done := make(chan bool)
+
 	go func() {
-		for msg := range msgChan {
-			log.Printf("Consumed message: %v\n", msg)
+		for {
+			select {
+			case <-ticker.C:
+				runIteration(consumer, producer)
+			case sig := <-sigChan:
+				log.Printf("Received signal %v, shutting down", sig)
+				done <- true
+				return
+			}
 		}
 	}()
 
-	consumedMessage, err := kafka_consumer.RunConsumer(consumer)
+	<-done
+	log.Println("Shutdown complete")
+	consumer.Close()
+}
+
+func runIteration(consumer *kafka_consumer.Consumer, producer *kafka_producer.Producer) {
+	consumedMessages, err := kafka_consumer.RunConsumer(consumer)
 	if err != nil {
 		log.Fatalf("Error running consumer: %v\n", err)
 	}
 
-	var cleansedMetrics []reducer.Metric
-	for _, metric := range consumedMessage.Metrics {
-		cleansedMetric := reducer.CleanseMetric(metric)
-		cleansedMetrics = append(cleansedMetrics, cleansedMetric)
+	if len(consumedMessages) == 0 {
+		log.Println("No messages consumed")
+		return
 	}
 
-	countedMetrics := reducer.CountMetrics(cleansedMetrics)
+	outputData := reducer.CreateOutputData(consumedMessages)
 
-	outputData := reducer.CreateOutputData(consumedMessage, countedMetrics)
+	var events []*pb.Event
+	for _, data := range outputData {
+		var metrics []*pb.AggregatedMetric
+		for _, metric := range data["metrics"].([]reducer.Metric) {
+			metrics = append(metrics, &pb.AggregatedMetric{
+				Count:           int32(metric["count"].(int)),
+				SnortDstAddress: metric["snort_dst_address"].(string),
+				SnortDstPort:    int32(metric["snort_dst_port"].(int64)),
+				SnortSrcAddress: metric["snort_src_address"].(string),
+				SnortSrcPort:    int32(metric["snort_src_port"].(int64)),
+			})
+		}
+		events = append(events, &pb.Event{
+			EventMetricsCount:   int32(data["event_metrics_count"].(int64)),
+			Metrics:             metrics,
+			SensorId:            data["sensor_id"].(string),
+			SnortClassification: *data["snort_classification"].(*string),
+			SnortMessage:        data["snort_message"].(string),
+			SnortPriority:       int32(data["snort_priority"].(int64)),
+			SnortSeconds:        data["snort_seconds"].(int64),
+		})
+	}
 
-	// Next steps: Hit the API with the outputData
+	reportAggregated := &pb.ReportAggregated{
+		Events: events,
+	}
 
-	outputFilePath := "output_v2.json"
-	outputFile, err := os.Create(outputFilePath)
+	// Produce the protobuf message
+	err = producer.ProduceMessage(reportAggregated)
 	if err != nil {
-		log.Fatalf("Error creating output file: %v\n", err)
-	}
-	defer outputFile.Close()
-
-	outputJSON, err := json.MarshalIndent(outputData, "", "    ")
-	if err != nil {
-		log.Fatalf("Error marshalling output data to JSON: %v\n", err)
+		log.Fatalf("Error producing message: %v\n", err)
 	}
 
-	_, err = outputFile.Write(outputJSON)
-	if err != nil {
-		log.Fatalf("Error writing to output file: %v\n", err)
-	}
-
-	fmt.Println("Output written to", outputFilePath)
-
+	fmt.Println("Produced message")
 }

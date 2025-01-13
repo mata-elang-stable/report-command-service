@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package pb;
+option go_package = "./pb";
+
+message AggregatedMetric {
+    int32 count = 1;
+    string snort_dst_address = 2;
+    int32 snort_dst_port = 3;
+    string snort_src_address = 4;
+    int32 snort_src_port = 5;
+}
+
+message Event {
+    int32 event_metrics_count = 1;
+    repeated AggregatedMetric metrics = 2;
+    string sensor_id = 3;
+    string snort_classification = 4;
+    string snort_message = 5;
+    int32 snort_priority = 6;
+    int64 snort_seconds = 7;
+}
+
+message ReportAggregated {
+    repeated Event events = 1;
+}
