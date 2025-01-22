@@ -13,7 +13,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde"
 	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde/protobuf"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"gitlab.com/mataelang/report-command-service/internal/pb"
+	"github.com/mata-elang-stable/report-command-service/internal/pb"
 )
 
 type Consumer struct {

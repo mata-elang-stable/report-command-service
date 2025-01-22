@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"gitlab.com/mataelang/report-command-service/internal/pb"
+	"github.com/mata-elang-stable/report-command-service/internal/pb"
 )
 
 type Metric map[string]interface{}
