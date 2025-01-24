@@ -48,6 +48,7 @@ func init() {
 	viper.SetDefault("kafka_topic_input", "sensor_events")
 	viper.SetDefault("kafka_topic_output", "me_report_aggregated")
 	viper.SetDefault("schema_registry_url", "http://localhost:8081")
+	viper.SetDefault("max_concurrent", 100)
 
 	if err := viper.Unmarshal(&conf); err != nil {
 		log.Fatalf("Failed to unmarshal configuration: %v", err)

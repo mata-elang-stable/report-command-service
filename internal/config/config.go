@@ -21,6 +21,12 @@ type Config struct {
 
 	// VerboseCount is the verbose level.
 	VerboseCount int `mapstructure:"verbose"`
+
+	// MaxConcurrent is the maximum number of concurrent requests.
+	MaxConcurrent int `mapstructure:"max_concurrent"`
+
+	// RepoApiUrl is the repository API URL.
+	RepoApiUrl string `mapstructure:"repo_api_url"`
 }
 
 var log = logger.GetLogger()
