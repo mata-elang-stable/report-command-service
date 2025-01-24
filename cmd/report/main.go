@@ -27,7 +27,11 @@ func runApp(cmd *cobra.Command, args []string) {
 	conf.SetupLogging()
 
 	// Handle shutdown signals for entire application
-	mainContext, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	mainContext, cancel := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
 	defer cancel()
 
 	//TODO - Create a new Kafka Consumer instance
@@ -125,7 +129,7 @@ MAINLOOP:
 				// log.Tracef("Received message: %v\n", value)
 
 				payload := value.(*pb.SensorEvent)
-				// payloadJson, err := json.MarshalIndent(payload, "", "  ")
+				payloadJson, err := json.MarshalIndent(payload, "", "  ")
 				if err != nil {
 					log.Errorf("Error marshalling message: %v\n", err)
 					continue
@@ -144,17 +148,17 @@ MAINLOOP:
 					continue
 				}
 
-				if payload.EventMetricsCount > 50 {
+				if payload.EventMetricsCount > 10 {
 					// log.Tracef("Processed: %s\n", payloadJson)
 					log.Tracef("Processed: %s\n", resultJson)
-					// filenameBefore := fmt.Sprintf("output/compare-%s-before.json", payload.EventHashSha256[:8])
-					// filenameAfter := fmt.Sprintf("output/compare-%s-after.json", payload.EventHashSha256[:8])
+					filenameBefore := fmt.Sprintf("output/compare-%s-before.json", payload.EventHashSha256[:8])
+					filenameAfter := fmt.Sprintf("output/compare-%s-after.json", payload.EventHashSha256[:8])
 
 					// // Write the output to file
-					// writeToFile(filenameBefore, payloadJson)
-					// writeToFile(filenameAfter, resultJson)
+					writeToFile(filenameBefore, payloadJson)
+					writeToFile(filenameAfter, resultJson)
 					// break MAINLOOP
-					// currentItems++
+					currentItems++
 				} else {
 					log.Tracef("Processed count: %d hash: %s\n", payload.EventMetricsCount, payload.EventHashSha256[:8])
 				}
@@ -194,11 +198,35 @@ func parsePriority(priority int64) string {
 	}
 }
 
+func roundTime(t int64, roundSeconds int64) int64 {
+	return (t / roundSeconds) * roundSeconds
+}
+
+func generateKeyHash(event *types.Event) string {
+	// Round down the time to the nearest hour
+	roundSeconds := int64(3600)
+
+	roundedTime := roundTime(event.SnortSeconds, roundSeconds)
+	event.SnortSeconds = roundedTime
+
+	keyData := fmt.Sprintf("%s;%s;%s;%s;%s;%d", 
+		event.SensorID,
+		event.SnortPriority,
+		event.SnortClassification,
+		event.SnortMessage,
+		event.SnortProtocol,
+		roundedTime,
+	)
+
+	return generateHashSHA256(keyData)
+}
+
 func parseMetric(payload *pb.SensorEvent) *types.Event {
 	// Parse priority to string
 	priority := parsePriority(payload.SnortPriority)
 
 	r := types.Event{
+		KeyHash: 		     "",
 		SensorID:            payload.SensorId,
 		SnortClassification: *payload.SnortClassification,
 		SnortMessage:        payload.SnortMessage,
@@ -206,31 +234,36 @@ func parseMetric(payload *pb.SensorEvent) *types.Event {
 		SnortProtocol:       payload.SnortProtocol,
 		SnortSeconds:        payload.SnortSeconds,
 		EventMetricsCount:   uint32(payload.EventMetricsCount),
-		Metrics:             []*types.Metric{},
+		Metrics:             []types.Metric{},
 	}
+
+	r.KeyHash = generateKeyHash(&r)
 
 	metricMap := sync.Map{}
 
-	pool := pond.NewPool(5)
+	concurrencyNumber := min(config.GetConfig().MaxConcurrent, int(payload.EventMetricsCount))
+
+	pool := pond.NewPool(concurrencyNumber)
 
 	for _, metric := range payload.Metrics {
 		// log.Infof("Metric: %v\n", metric)
 
 		pool.Submit(func() {
-			m := types.Metric{
+			m := types.MetricDraft{
 				Count:           0,
 				SnortDstAddress: metric.SnortDstAddress,
 				SnortSrcAddress: metric.SnortSrcAddress,
 			}
 
 			dataKey := fmt.Sprintf("%s;%s", *metric.SnortSrcAddress, *metric.SnortDstAddress)
-			key := generateHashSHA256(dataKey)
+			// key := generateHashSHA256(dataKey)
+			key := dataKey
 
 			// Add port
 			dstSrcPort := fmt.Sprintf("%d:%d", *metric.SnortDstPort, *metric.SnortSrcPort)
 
 			d, _ := metricMap.LoadOrStore(key, &m)
-			d.(*types.Metric).StoreOrIncrementDstSrcPort(dstSrcPort)
+			d.(*types.MetricDraft).StoreOrIncrementDstSrcPort(dstSrcPort)
 		})
 	}
 
@@ -238,7 +271,7 @@ func parseMetric(payload *pb.SensorEvent) *types.Event {
 
 	// Convert the sync.Map to a slice of AggregatedMetric
 	metricMap.Range(func(key, value interface{}) bool {
-		r.Metrics = append(r.Metrics, value.(*types.Metric))
+		r.Metrics = append(r.Metrics, value.(*types.MetricDraft).ToMetric())
 		return true
 	})
 
