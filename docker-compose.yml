@@ -1,0 +1,21 @@
+---
+services:
+  report-command-service:
+    image: report-command-service-report-command-service
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_INPUT: sensor_events
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      REPORT_API_URL: http://172.17.0.1:8000
+      VERBOSE: 2
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: unless-stopped
+        delay: 10s
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
