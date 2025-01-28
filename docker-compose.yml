@@ -1,7 +1,8 @@
 ---
 services:
   report-command-service:
-    image: report-command-service-report-command-service
+    # image: docker-image-report-command-service
+    build: .
     restart: unless-stopped
     environment:
       KAFKA_BROKERS: kafka:9092
