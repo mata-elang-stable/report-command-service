@@ -39,7 +39,6 @@ func init() {
 		log.WithField("error", err).Warnln("Failed to read configuration file")
 	}
 
-	viper.SetEnvPrefix("app")
 	viper.AutomaticEnv()
 
 	conf := config.GetConfig()
