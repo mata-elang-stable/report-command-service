@@ -16,17 +16,18 @@ type Config struct {
 	// InputKafkaTopic is the Kafka topic.
 	InputKafkaTopic string `mapstructure:"kafka_topic_input"`
 
-	// OutputKafkaTopic is the Kafka topic.
-	OutputKafkaTopic string `mapstructure:"kafka_topic_output"`
-
 	// VerboseCount is the verbose level.
 	VerboseCount int `mapstructure:"verbose"`
 
 	// MaxConcurrent is the maximum number of concurrent requests.
 	MaxConcurrent int `mapstructure:"max_concurrent"`
 
-	// RepoApiUrl is the repository API URL.
-	RepoApiUrl string `mapstructure:"repo_api_url"`
+	// ReportApiUrl is the repository API URL.
+	ReportApiUrl        string `mapstructure:"report_api_url"`
+	ReportPostEventPath string `mapstructure:"report_post_event_path"`
+
+	HTTPTimeoutSeconds int `mapstructure:"http_timeout_seconds"`
+	HTTPMaxRetries     int `mapstructure:"http_max_retries"`
 }
 
 var log = logger.GetLogger()

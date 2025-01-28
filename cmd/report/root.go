@@ -46,8 +46,11 @@ func init() {
 
 	viper.SetDefault("kafka_brokers", "localhost:9092")
 	viper.SetDefault("kafka_topic_input", "sensor_events")
-	viper.SetDefault("kafka_topic_output", "me_report_aggregated")
 	viper.SetDefault("schema_registry_url", "http://localhost:8081")
+	viper.SetDefault("report_api_url", "http://localhost:8000")
+	viper.SetDefault("report_post_event_path", "/events")
+	viper.SetDefault("http_timeout_seconds", 5)
+	viper.SetDefault("http_max_retries", 3)
 	viper.SetDefault("max_concurrent", 100)
 
 	if err := viper.Unmarshal(&conf); err != nil {
@@ -59,7 +62,7 @@ func init() {
 	flags.StringVar(&conf.KafkaBrokers, "kafka-brokers", conf.KafkaBrokers, "")
 	flags.StringVar(&conf.InputKafkaTopic, "input-topic", conf.InputKafkaTopic, "")
 	flags.StringVar(&conf.SchemaRegistryUrl, "schema-registry-url", conf.SchemaRegistryUrl, "")
-	flags.StringVar(&conf.OutputKafkaTopic, "output-topic", conf.OutputKafkaTopic, "")
+	flags.StringVar(&conf.ReportApiUrl, "url", conf.ReportApiUrl, "Mata Elang ReportApi Base URL")
 	flags.CountVarP(&conf.VerboseCount, "verbose", "v", "Increase verbosity of the output.")
 
 	if err := viper.BindPFlags(flags); err != nil {
