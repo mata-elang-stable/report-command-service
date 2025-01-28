@@ -2,4 +2,4 @@
 PROTOC = protoc
 
 proto-compile: ## Compile proto file
-	$(PROTOC) --go_out=./internal --go-grpc_out=./internal protos/sensor_events.proto
+	$(PROTOC) --go_out=./internal protos/sensor_events.proto
