@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - workflow  # Trigger workflow on push to the main branch
+      - main  # Trigger workflow on push to the main branch
   pull_request:
     branches:
       - main  # Optional: Run the workflow on PRs targeting main
@@ -32,5 +32,6 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/arm64,linux/amd64
           push: true
           tags: ghcr.io/${{ github.repository }}:latest
