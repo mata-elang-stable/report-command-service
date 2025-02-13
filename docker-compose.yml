@@ -1,7 +1,7 @@
 ---
 services:
   report-command-service:
-    # image: docker-image-report-command-service
+    image: ghcr.io/mata-elang-stable/report-command-service:main
     build: .
     restart: unless-stopped
     environment:

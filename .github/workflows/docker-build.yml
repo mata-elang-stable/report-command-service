@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Image report command service
 
 on:
   push:
@@ -8,30 +8,66 @@ on:
     branches:
       - main  # Optional: Run the workflow on PRs targeting main
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  BUILDER_NAME: mybuilder
+  BUILD_PLATFORMS_TARGET: linux/amd64
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
 jobs:
-  build-and-push:
+  build-image:
     runs-on: image-builder
-
-    permissions:
-      contents: read
-      packages: write  # Required to push to GitHub Container Registry
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.ACCESS_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          logout: false
 
-      - name: Build and push
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        if: github.event_name != 'pull_request'
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=true
+            prefix=
+            suffix=
+
+      - name: Expose GitHub Runtime
+        if: github.event_name != 'pull_request'
+        uses: crazy-max/ghaction-github-runtime@v3
+
+      - name: Build
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/arm64,linux/amd64
-          push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          platforms: ${{ env.BUILD_PLATFORMS_TARGET }}
+          push: ${{ github.event_name != 'pull_request' }}
+          builder: ${{ env.BUILDER_NAME }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate artifact attestation
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
