@@ -79,7 +79,9 @@ func makeRequest(req *http.Request, timeout time.Duration) error {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		log.Errorf("Failed to send request: %v", err)
+		log.Errorf("Failed to send request with status code: %d", res.StatusCode)
+		log.Debugf("Reason: %v", res.Body)
+		return errors.New("failed to send request")
 	}
 
 	return nil
